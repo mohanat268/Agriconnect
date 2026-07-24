@@ -1,0 +1,15 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read and write access to soil_test_bookings collection for authenticated users or open access
+    match /soil_test_bookings/{bookingId} {
+      allow read, write: if true;
+    }
+    
+    // Fallback rule for all other collections
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
