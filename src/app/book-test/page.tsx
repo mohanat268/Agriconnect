@@ -18,15 +18,16 @@ import {
   addDoc, 
   query, 
   where, 
-  getDocs 
+  onSnapshot
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { defaultLabs, DefaultLab } from '@/lib/labsData';
 
-interface FirebaseBooking {
+export interface FirebaseBooking {
   id?: string;
   bookingId: string;
   userId: string;
+  userEmail?: string;
   selectedLab: string;
   farmerName: string;
   phone: string;
@@ -56,9 +57,11 @@ export default function BookSoilTestPage() {
   const [successBooking, setSuccessBooking] = useState<FirebaseBooking | null>(null);
   const [bookingsList, setBookingsList] = useState<FirebaseBooking[]>([]);
 
-  // Listen to Auth State and Fetch Real User Bookings from Firebase Firestore
+  // Listen to Auth State and Real-Time Firebase Firestore Synchronization
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    let unsubscribeFirestore: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
         setFormData((prev) => ({
@@ -66,33 +69,39 @@ export default function BookSoilTestPage() {
           farmerName: user.displayName || user.email?.split('@')[0] || prev.farmerName,
           email: user.email || prev.email
         }));
-        fetchUserFirebaseBookings(user.uid);
+
+        // 🔥 REAL-TIME FIREBASE FIRESTORE LISTENER
+        const q = query(
+          collection(db, 'soil_test_bookings'),
+          where('userId', '==', user.uid)
+        );
+
+        unsubscribeFirestore = onSnapshot(
+          q,
+          (snapshot) => {
+            const userBookings: FirebaseBooking[] = [];
+            snapshot.forEach((doc) => {
+              userBookings.push({ id: doc.id, ...doc.data() } as FirebaseBooking);
+            });
+            // Sort newest first
+            userBookings.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+            setBookingsList(userBookings);
+          },
+          (err) => {
+            console.error('Firestore listener error:', err);
+          }
+        );
       } else {
+        setCurrentUser(null);
         setBookingsList([]);
       }
     });
-    return () => unsubscribe();
-  }, []);
 
-  // Fetch strictly the logged-in user's real lab test bookings from Firebase Firestore
-  const fetchUserFirebaseBookings = async (uid: string) => {
-    try {
-      const q = query(
-        collection(db, 'soil_test_bookings'),
-        where('userId', '==', uid)
-      );
-      const querySnapshot = await getDocs(q);
-      const userBookings: FirebaseBooking[] = [];
-      querySnapshot.forEach((doc) => {
-        userBookings.push({ id: doc.id, ...doc.data() } as FirebaseBooking);
-      });
-      // Sort newest first
-      userBookings.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      setBookingsList(userBookings);
-    } catch (err) {
-      console.error('Error fetching Firestore bookings for user:', err);
-    }
-  };
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeFirestore) unsubscribeFirestore();
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,14 +135,13 @@ export default function BookSoilTestPage() {
     };
 
     try {
-      // Store real booking data in Firebase Firestore
+      // 🔥 WRITE DIRECTLY TO FIREBASE FIRESTORE
       const docRef = await addDoc(collection(db, 'soil_test_bookings'), newBookingData);
       const createdBooking: FirebaseBooking = { id: docRef.id, ...newBookingData };
 
       setSuccessBooking(createdBooking);
-      fetchUserFirebaseBookings(currentUser.uid);
 
-      // Reset form fields
+      // Reset Form Fields
       setFormData((prev) => ({
         ...prev,
         farmAddress: '',
@@ -142,7 +150,7 @@ export default function BookSoilTestPage() {
       }));
     } catch (err) {
       console.error('Firebase Firestore save error:', err);
-      alert('Failed to save booking to Firebase.');
+      alert('Failed to save booking to Firebase Firestore.');
     } finally {
       setSubmitting(false);
     }
@@ -154,23 +162,23 @@ export default function BookSoilTestPage() {
       <div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-agri-green-soft border border-agri-green/20 text-xs font-bold text-agri-green-dark mb-2">
           <FlaskConical className="w-3.5 h-3.5" />
-          <span>Doorstep Sample Collection & Lab Booking</span>
+          <span>Doorstep Sample Collection & Firebase Lab Booking</span>
         </div>
         <h1 className="text-2xl font-extrabold text-agri-text-main">
           Book Soil Test Appointment
         </h1>
         <p className="text-xs text-agri-text-subtle max-w-2xl">
-          Select your preferred certified soil testing laboratory, package, and schedule doorstep sample collection for your farm.
+          Select your preferred certified soil testing laboratory, package, and schedule doorstep sample collection stored directly in Firebase Firestore.
         </p>
       </div>
 
       {/* Success Notification Banner */}
       {successBooking && (
-        <div className="p-6 bg-emerald-50 border-2 border-emerald-500 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-emerald-900 shadow-md">
+        <div className="p-6 bg-emerald-50 border-2 border-emerald-500 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-emerald-900 shadow-md animate-in fade-in zoom-in-95">
           <div className="flex items-center gap-3">
             <CheckCircle className="w-8 h-8 text-emerald-600 flex-shrink-0" />
             <div>
-              <h3 className="font-bold text-base">Booking Saved to Firebase! #{successBooking.bookingId}</h3>
+              <h3 className="font-bold text-base">Booking Saved to Firebase Firestore! #{successBooking.bookingId}</h3>
               <p className="text-xs text-emerald-700">
                 Booked at <strong>{successBooking.selectedLab}</strong> for <strong>{successBooking.preferredDate}</strong>.
               </p>
@@ -185,7 +193,7 @@ export default function BookSoilTestPage() {
         </div>
       )}
 
-      {/* Main Grid: Multi-Step Booking Form & User's Real Firebase Bookings */}
+      {/* Main Grid: Multi-Step Booking Form & User's Real Firebase Firestore Bookings */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Form Container */}
         <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-2xl border border-agri-surface-container shadow-card space-y-8">
@@ -381,32 +389,32 @@ export default function BookSoilTestPage() {
               className="w-full py-4 px-6 bg-agri-green hover:bg-agri-green-dark text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {submitting ? (
-                <span>Saving Booking to Firebase...</span>
+                <span>Saving to Firebase Firestore...</span>
               ) : (
                 <>
                   <CalendarCheck className="w-4 h-4" />
-                  <span>Confirm & Schedule Lab Visit</span>
+                  <span>Confirm & Save Booking to Firebase</span>
                 </>
               )}
             </button>
           </form>
         </div>
 
-        {/* Sidebar: Real User Firebase Lab Test Bookings (No Status Labels) */}
+        {/* Sidebar: Real User Firebase Firestore Bookings */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-agri-surface-container shadow-card space-y-4">
             <h3 className="font-bold text-base text-agri-text-main flex items-center justify-between">
               <span>My Lab Bookings</span>
-              <span className="text-xs font-normal text-agri-text-subtle">
-                {bookingsList.length} Real Bookings
+              <span className="text-xs font-semibold text-agri-green bg-agri-green-soft px-2 py-0.5 rounded-md">
+                Firestore
               </span>
             </h3>
 
             <div className="space-y-3">
               {bookingsList.length === 0 ? (
                 <div className="p-6 text-center rounded-xl bg-agri-surface-low border border-agri-surface-container text-xs text-agri-text-subtle space-y-1">
-                  <p className="font-bold text-agri-text-main">No lab test bookings found.</p>
-                  <p>Book your first test using the form on the left!</p>
+                  <p className="font-bold text-agri-text-main">No Firestore bookings found.</p>
+                  <p>Book a test using the form to save to Firestore!</p>
                 </div>
               ) : (
                 bookingsList.map((bk) => (
@@ -416,7 +424,7 @@ export default function BookSoilTestPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-agri-green-dark">{bk.bookingId}</span>
-                      <span className="text-[10px] text-agri-text-subtle">
+                      <span className="text-[10px] text-agri-text-subtle font-semibold">
                         {bk.preferredDate}
                       </span>
                     </div>

@@ -10,15 +10,16 @@ const publicPaths = ['/login', '/register'];
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(auth.currentUser);
-  const [loading, setLoading] = useState(!auth.currentUser);
+  const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
   const pathname = usePathname();
 
+  const isPublicPage = publicPaths.includes(pathname);
+
   useEffect(() => {
-    // If auth state is already known, avoid showing full screen loader
-    if (auth.currentUser) {
-      setUser(auth.currentUser);
-      setLoading(false);
+    // If not authenticated and accessing a protected page, redirect immediately
+    if (!auth.currentUser && !isPublicPage) {
+      router.replace('/login');
     }
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -26,18 +27,26 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       setLoading(false);
 
       if (!currentUser && !publicPaths.includes(pathname)) {
-        router.push('/login');
+        router.replace('/login');
       } else if (currentUser && publicPaths.includes(pathname)) {
-        router.push('/');
+        router.replace('/');
       }
     });
 
     return () => unsubscribe();
-  }, [pathname, router]);
+  }, [pathname, router, isPublicPage]);
 
-  const isPublicPage = publicPaths.includes(pathname);
+  if (isPublicPage) {
+    return <>{children}</>;
+  }
 
-  if (loading && !isPublicPage) {
+  // If user is authenticated, render children immediately (0ms delay)
+  if (user || auth.currentUser) {
+    return <>{children}</>;
+  }
+
+  // Fallback temporary spinner only during initial auth resolution
+  if (loading) {
     return (
       <div className="min-h-screen bg-agri-surface flex flex-col items-center justify-center p-6 text-agri-text-main">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-agri-green-dark to-agri-green flex items-center justify-center text-white shadow-elevated animate-pulse mb-3">
@@ -51,13 +60,5 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isPublicPage) {
-    return <>{children}</>;
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  return <>{children}</>;
+  return null;
 }
