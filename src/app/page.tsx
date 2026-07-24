@@ -340,7 +340,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Quick Lab Test Booking Callout */}
+          {/* Quick Lab Test Booking Callout
           <div className="bg-gradient-to-br from-agri-surface-container to-white p-6 rounded-2xl border border-agri-surface-container space-y-3">
             <div className="w-8 h-8 rounded-lg bg-agri-green-soft text-agri-green flex items-center justify-center">
               <PlusCircle className="w-5 h-5" />
@@ -356,6 +356,7 @@ export default function DashboardPage() {
               Book Lab Technician Visit
             </Link>
           </div>
+          */}
         </div>
       </div>
     </div>
