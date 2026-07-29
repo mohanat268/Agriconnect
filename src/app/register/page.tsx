@@ -114,7 +114,15 @@ export default function RegisterPage() {
     } catch (err: unknown) {
       console.error('Google Auth Registration Error:', err);
       const msg = err instanceof Error ? err.message : String(err);
-      setError('Google Registration Notice: ' + (msg || 'Sign up failed.'));
+      if (msg.includes('auth/popup-closed-by-user')) {
+        setError('Google sign up popup was closed. Please try again.');
+      } else if (msg.includes('auth/popup-blocked')) {
+        setError('Google sign up popup was blocked by your browser. Please allow popups.');
+      } else if (msg.includes('auth/unauthorized-domain')) {
+        setError('Firebase Auth Error (auth/unauthorized-domain): This hostname is not authorized in Firebase Console. If running locally, please open http://localhost:3000 instead of 127.0.0.1, or add your domain to Firebase Console > Authentication > Settings > Authorized Domains.');
+      } else {
+        setError('Google Registration Notice: ' + (msg || 'Sign up failed.'));
+      }
     } finally {
       setLoading(false);
     }
