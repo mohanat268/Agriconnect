@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   ArrowRight,
   ShieldCheck,
-  PlusCircle,
   FlaskConical,
   MapPin
 } from 'lucide-react';
@@ -339,24 +338,6 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-
-          {/* Quick Lab Test Booking Callout
-          <div className="bg-gradient-to-br from-agri-surface-container to-white p-6 rounded-2xl border border-agri-surface-container space-y-3">
-            <div className="w-8 h-8 rounded-lg bg-agri-green-soft text-agri-green flex items-center justify-center">
-              <PlusCircle className="w-5 h-5" />
-            </div>
-            <h4 className="font-bold text-sm text-agri-text-main">Need an Official Soil Test?</h4>
-            <p className="text-xs text-agri-text-subtle leading-relaxed">
-              Book a doorstep lab technician sample collection for your farm fields.
-            </p>
-            <Link
-              href="/book-test"
-              className="inline-block w-full text-center py-2.5 px-4 bg-agri-green text-white font-bold text-xs rounded-xl shadow-xs hover:bg-agri-green-dark transition-colors"
-            >
-              Book Lab Technician Visit
-            </Link>
-          </div>
-          */}
         </div>
       </div>
     </div>
